@@ -11,12 +11,20 @@ browser.contextMenus.create( {
     contexts: [ "tab" ]
 } );
 
+let activeWindowId;
+browser.windows.getCurrent().then( window => {
+    activeWindowId = window.id;
+    updateWindowsList( activeWindowId );
+} );
+
+
 // Function to update windows list and menu items
-async function updateWindowsList() {
+async function updateWindowsList(currentActiveWindowId) { // Added currentActiveWindowId parameter
     console.log( 'Updating windows list...' );
     // Get all windows
     const windows = await browser.windows.getAll( { populate: true } );
     currentWindows = windows;
+    console.log(currentWindows);
 
     // Remove existing window menu items
     menuItemIds.forEach( id => {
@@ -24,10 +32,12 @@ async function updateWindowsList() {
     } );
     menuItemIds = [];
 
-    // Create new menu items for each window
+    // Create new menu items for each window, excluding the current one
     windows.forEach( win => {
-        const activeTab = win.tabs.find(tab => tab.active);
-        const windowName = activeTab?.title || `Window ${win.id}`;
+        if ( win.id === currentActiveWindowId ) { // Skip the current window
+            return;
+        }
+        const windowName = win.title || `Window ${win.id}`;
         const menuId = `move-to-window-${win.id}`;
         browser.contextMenus.create( {
             id: menuId,
@@ -41,12 +51,18 @@ async function updateWindowsList() {
 
 
 // Update windows list when context menu is shown
-browser.contextMenus.onShown.addListener( () => {
-    updateWindowsList();
+browser.contextMenus.onShown.addListener( (info, tab) => { // tab parameter gives us windowId
+    if (tab && tab.windowId) {
+        updateWindowsList(tab.windowId); // Pass the current window's ID
+    } else {
+        // Fallback or error handling if tab info isn't available
+        updateWindowsList(null);
+    }
 } );
 
 // Handle clicks on dynamically created window items
 browser.contextMenus.onClicked.addListener((info, tab) => {
+
     console.log( 'Context menu clicked:', info.menuItemId );
     if (info.menuItemId.startsWith("move-to-window-")) {
         const targetWindowId = parseInt(info.menuItemId.split("-").pop(), 10);
@@ -59,17 +75,13 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
 // Function to move the tab to the selected window
 function moveTabToWindow(tabId, targetWindowId, switchToTarget = false) {
     console.log( `Moving tab ${tabId} to window ${targetWindowId}... Switch focus: ${switchToTarget}` );
-    // browser.tabs.move returns a promise that resolves to the moved tab's details (or an array if multiple tabs are moved)
     browser.tabs.move(tabId, { windowId: targetWindowId, index: -1 }).then(movedTabInfo => {
-        // In this case, movedTabInfo will be the Tab object of the moved tab.
-        // If you were moving multiple tabs, it would be an array of Tab objects.
         const movedTab = Array.isArray(movedTabInfo) ? movedTabInfo[0] : movedTabInfo;
         console.log(`Tab ${movedTab.id} moved to window ${targetWindowId}`);
 
         if (switchToTarget) {
             browser.windows.update(targetWindowId, { focused: true }).then(() => {
                 console.log(`Switched focus to window ${targetWindowId}`);
-                // Now, activate the moved tab
                 browser.tabs.update(movedTab.id, { active: true }).then(() => {
                     console.log(`Activated tab ${movedTab.id} in window ${targetWindowId}`);
                 }).catch(error => {
