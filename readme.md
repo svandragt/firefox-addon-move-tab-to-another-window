@@ -3,6 +3,9 @@
 A Firefox extension that enables easy movement of tabs between different browser windows through a convenient context
 menu.
 
+![image](https://github.com/user-attachments/assets/4c703f16-ba26-4f31-ae3a-a914b3b529b3)
+
+
 ## Features
 
 - Move tabs between existing windows with a right-click
