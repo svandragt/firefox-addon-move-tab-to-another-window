@@ -1,24 +1,23 @@
 // Store current windows list
-// noinspection JSUnresolvedReference
-
 let currentWindows = [];
 let menuItemIds = [];
 
 // Create context menu item for moving tab to another window
-browser.contextMenus.create( {
+browser.contextMenus.create({
     id: "move-tab-to-window",
     title: "Move tab to another Window",
-    contexts: [ "tab" ]
-} );
+    contexts: ["tab"]
+});
 
-let activeWindowId;
-browser.windows.getCurrent().then( window => {
-    activeWindowId = window.id;
-    updateWindowsList( activeWindowId );
-} );
+// Listen for window removal
+browser.windows.onRemoved.addListener(async (windowId) => {
+    console.log('Window removed:', windowId);
+    // Get the current active window
+    const currentWindow = await browser.windows.getCurrent();
+    // Update the windows list with the current window ID
+    await updateWindowsList(currentWindow.id);
+});
 
-
-// Function to update windows list and menu items
 async function updateWindowsList(currentActiveWindowId) {
     console.log('Updating windows list...', 'Current active window:', currentActiveWindowId);
 
@@ -74,17 +73,14 @@ async function updateWindowsList(currentActiveWindowId) {
     console.log('Final menuItemIds:', menuItemIds);
 }
 
-
 // Update windows list when context menu is shown
-browser.contextMenus.onShown.addListener(async (info, tab) => { // Make the listener async
+browser.contextMenus.onShown.addListener(async (info, tab) => {
     try {
         if (tab && tab.windowId) {
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            await updateWindowsList(tab.windowId); // Await the completion of updateWindowsList
+            await updateWindowsList(tab.windowId);
         } else {
-            // Fallback or error handling if tab info isn't available
-            await updateWindowsList(null);
+            const currentWindow = await browser.windows.getCurrent();
+            await updateWindowsList(currentWindow.id);
         }
     } catch (error) {
         console.error("Error updating windows list onShown:", error);
@@ -93,8 +89,7 @@ browser.contextMenus.onShown.addListener(async (info, tab) => { // Make the list
 
 // Handle clicks on dynamically created window items
 browser.contextMenus.onClicked.addListener((info, tab) => {
-
-    console.log( 'Context menu clicked:', info.menuItemId );
+    console.log('Context menu clicked:', info.menuItemId);
     if (info.menuItemId.startsWith("move-to-window-")) {
         const targetWindowId = parseInt(info.menuItemId.split("-").pop(), 10);
         const switchToTarget = info.modifiers.includes("Shift");
@@ -102,10 +97,9 @@ browser.contextMenus.onClicked.addListener((info, tab) => {
     }
 });
 
-
 // Function to move the tab to the selected window
 function moveTabToWindow(tabId, targetWindowId, switchToTarget = false) {
-    console.log( `Moving tab ${tabId} to window ${targetWindowId}... Switch focus: ${switchToTarget}` );
+    console.log(`Moving tab ${tabId} to window ${targetWindowId}... Switch focus: ${switchToTarget}`);
     browser.tabs.move(tabId, { windowId: targetWindowId, index: -1 }).then(movedTabInfo => {
         const movedTab = Array.isArray(movedTabInfo) ? movedTabInfo[0] : movedTabInfo;
         console.log(`Tab ${movedTab.id} moved to window ${targetWindowId}`);

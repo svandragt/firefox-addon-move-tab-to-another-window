@@ -4,7 +4,8 @@
   "version": "1.0",
   "permissions": [
     "tabs",
-    "contextMenus"
+    "contextMenus",
+    "windows"
   ],
   "background": {
     "scripts": ["background.js"],
