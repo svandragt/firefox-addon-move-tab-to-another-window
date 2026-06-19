@@ -69,7 +69,7 @@ async function updateWindowsList( currentActiveWindowId ) {
         contexts: [ "tab" ],
         parentId: "move-tab-to-window"
     } );
-    menuItemIds.push( menuId );
+    menuItemIds.push( "move-tab-to-new-window" );
 
     // Force refresh the context menu
     try {
