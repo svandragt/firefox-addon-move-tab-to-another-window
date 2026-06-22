@@ -51,7 +51,7 @@ async function _rebuildMenu( currentActiveWindowId ) {
 
     // Create new menu items for each window
     for ( const win of windows ) {
-        if ( win.id === currentActiveWindowId ) {
+        if ( win.id === currentActiveWindowId || win.type !== "normal" ) {
             continue;
         }
 
