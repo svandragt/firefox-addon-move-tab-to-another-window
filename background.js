@@ -11,27 +11,21 @@ browser.contextMenus.create( {
 
 // Listen for window removal
 browser.windows.onRemoved.addListener( async ( windowId ) => {
-    console.log( 'Window removed:', windowId );
-    // Get the current active window
     const currentWindow = await browser.windows.getCurrent();
-    // Update the windows list with the current window ID
     await updateWindowsList( currentWindow.id );
 } );
 
 async function updateWindowsList( currentActiveWindowId ) {
-    console.log( 'Updating windows list...', 'Current active window:', currentActiveWindowId );
-
     // Get all windows
     const windows = await browser.windows.getAll( { populate: true } );
     currentWindows = windows;
-    console.log( 'Found windows:', windows.length, 'Windows:', windows.map( w => w.id ) );
 
     // Remove ALL items first
     for ( const id of menuItemIds ) {
         try {
             await browser.contextMenus.remove( id );
         } catch ( error ) {
-            console.warn( `Could not remove menu item ${id}:`, error );
+            // Item may already be gone
         }
     }
     menuItemIds = [];
@@ -39,15 +33,12 @@ async function updateWindowsList( currentActiveWindowId ) {
     // Create new menu items for each window
     for ( const win of windows ) {
         if ( win.id === currentActiveWindowId ) {
-            console.log( `Skipping current window ${win.id}` );
             continue;
         }
 
         const activeTabInWin = win.tabs && win.tabs.find( tab => tab.active );
-        const windowName = activeTabInWin?.title || `Window ${win.id}`;
+        const windowName = win.title || activeTabInWin?.title || `Window ${win.id}`;
         const menuId = `move-to-window-${win.id}`;
-
-        console.log( `Creating menu item for window ${win.id} with name "${windowName}"` );
 
         try {
             await browser.contextMenus.create( {
@@ -57,9 +48,8 @@ async function updateWindowsList( currentActiveWindowId ) {
                 parentId: "move-tab-to-window"
             } );
             menuItemIds.push( menuId );
-            console.log( `Successfully created menu item ${menuId}` );
         } catch ( error ) {
-            console.error( `Error creating menu item for window ${win.id}:`, error );
+            // Skip windows we can't create a menu item for
         }
     }
 
@@ -71,26 +61,24 @@ async function updateWindowsList( currentActiveWindowId ) {
     } );
     menuItemIds.push( "move-tab-to-new-window" );
 
-    // Force refresh the context menu
     try {
         await browser.contextMenus.refresh();
     } catch ( error ) {
-        console.error( 'Error refreshing context menu:', error );
+        // Refresh may not be available in all contexts
     }
-
-    console.log( 'Final menuItemIds:', menuItemIds );
-
-
 }
 
-// Function to create a new window with the selected tab
-function createNewWindowWithTab( tabId ) {
-    console.log( `Creating new window with tab ${tabId}` );
-    browser.windows.create( { tabId: tabId } ).then( newWindow => {
-        console.log( `Created new window ${newWindow.id} with tab ${tabId}` );
-    } ).catch( error => {
-        console.error( `Error creating new window: ${error}` );
-    } );
+async function getSelectedTabIds( tab ) {
+    const highlighted = await browser.tabs.query( { highlighted: true, windowId: tab.windowId } );
+    return highlighted.length > 1 ? highlighted.map( t => t.id ) : [ tab.id ];
+}
+
+// Function to create a new window with the selected tabs
+async function createNewWindowWithTabs( tabIds ) {
+    const newWindow = await browser.windows.create( { tabId: tabIds[0] } );
+    if ( tabIds.length > 1 ) {
+        await browser.tabs.move( tabIds.slice( 1 ), { windowId: newWindow.id, index: -1 } );
+    }
 }
 
 // Update windows list when context menu is shown
@@ -103,42 +91,30 @@ browser.contextMenus.onShown.addListener( async ( info, tab ) => {
             await updateWindowsList( currentWindow.id );
         }
     } catch ( error ) {
-        console.error( "Error updating windows list onShown:", error );
+        // Silently fail if we can't update the menu
     }
 } );
 
 // Handle clicks on dynamically created window items
-browser.contextMenus.onClicked.addListener( ( info, tab ) => {
-    console.log( 'Context menu clicked:', info.menuItemId );
+browser.contextMenus.onClicked.addListener( async ( info, tab ) => {
+    const tabIds = await getSelectedTabIds( tab );
     if ( info.menuItemId.startsWith( "move-to-window-" ) ) {
         const targetWindowId = parseInt( info.menuItemId.split( "-" ).pop(), 10 );
         const switchToTarget = info.modifiers.includes( "Shift" );
-        moveTabToWindow( tab.id, targetWindowId, switchToTarget );
+        moveTabsToWindow( tabIds, targetWindowId, switchToTarget );
     } else if ( info.menuItemId === "move-tab-to-new-window" ) {
-        createNewWindowWithTab( tab.id );
+        createNewWindowWithTabs( tabIds );
     }
 } );
 
-// Function to move the tab to the selected window
-function moveTabToWindow( tabId, targetWindowId, switchToTarget = false ) {
-    console.log( `Moving tab ${tabId} to window ${targetWindowId}... Switch focus: ${switchToTarget}` );
-    browser.tabs.move( tabId, { windowId: targetWindowId, index: -1 } ).then( movedTabInfo => {
-        const movedTab = Array.isArray( movedTabInfo ) ? movedTabInfo[0] : movedTabInfo;
-        console.log( `Tab ${movedTab.id} moved to window ${targetWindowId}` );
-
+// Function to move tabs to the selected window
+function moveTabsToWindow( tabIds, targetWindowId, switchToTarget = false ) {
+    browser.tabs.move( tabIds, { windowId: targetWindowId, index: -1 } ).then( movedTabInfo => {
         if ( switchToTarget ) {
+            const movedTab = Array.isArray( movedTabInfo ) ? movedTabInfo[0] : movedTabInfo;
             browser.windows.update( targetWindowId, { focused: true } ).then( () => {
-                console.log( `Switched focus to window ${targetWindowId}` );
-                browser.tabs.update( movedTab.id, { active: true } ).then( () => {
-                    console.log( `Activated tab ${movedTab.id} in window ${targetWindowId}` );
-                } ).catch( error => {
-                    console.error( `Error activating tab: ${error}` );
-                } );
-            } ).catch( error => {
-                console.error( `Error focusing window: ${error}` );
+                browser.tabs.update( movedTab.id, { active: true } );
             } );
         }
-    } ).catch( error => {
-        console.error( `Error moving tab: ${error}` );
     } );
 }

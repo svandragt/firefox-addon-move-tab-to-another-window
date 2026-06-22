@@ -19,9 +19,7 @@ menu.
 
 ### From Firefox Add-ons (Recommended)
 
-1. Download the addon from Firefox Add-ons (coming soon)
-2. Click "Add to Firefox" to install
-3. Grant the required permissions when prompted
+Install from the Firefox Add-ons directory — link coming once published.
 
 ### Load as Temporary Add-on (Development)
 
@@ -39,7 +37,7 @@ menu.
 
 ## Browser Compatibility
 
-- Tested against Firefox 138 and later, might support earlier versions. 
+- Requires Firefox 109 or later.
 
 ## Permissions
 
@@ -50,12 +48,10 @@ This addon requires the following permissions:
 
 ## Development
 
-To build this addon locally:
-
 1. Clone this repository
-2. Load it as a temporary addon in Firefox (about:debugging)
-3. Make your changes
-4. Submit a pull request with your improvements
+2. Open `about:debugging#/runtime/this-firefox` in Firefox
+3. Click **Load Temporary Add-on** and select `manifest.json`
+4. After editing, hit **Reload** on that page to pick up changes
 
 ## License
 
