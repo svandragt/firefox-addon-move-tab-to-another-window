@@ -37,7 +37,7 @@ Install from the Firefox Add-ons directory — link coming once published.
 
 ## Browser Compatibility
 
-- Requires Firefox 109 or later.
+- Requires Firefox 142 or later.
 
 ## Permissions
 

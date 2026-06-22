@@ -1,6 +1,7 @@
-// Store current windows list
 let currentWindows = [];
 let menuItemIds = [];
+let rebuildInProgress = false;
+let pendingRebuildWindowId = null;
 
 // Create context menu items for moving tab to another window
 browser.contextMenus.create( {
@@ -16,6 +17,24 @@ browser.windows.onRemoved.addListener( async ( windowId ) => {
 } );
 
 async function updateWindowsList( currentActiveWindowId ) {
+    if ( rebuildInProgress ) {
+        pendingRebuildWindowId = currentActiveWindowId;
+        return;
+    }
+    rebuildInProgress = true;
+    try {
+        await _rebuildMenu( currentActiveWindowId );
+    } finally {
+        rebuildInProgress = false;
+        if ( pendingRebuildWindowId !== null ) {
+            const id = pendingRebuildWindowId;
+            pendingRebuildWindowId = null;
+            await updateWindowsList( id );
+        }
+    }
+}
+
+async function _rebuildMenu( currentActiveWindowId ) {
     // Get all windows
     const windows = await browser.windows.getAll( { populate: true } );
     currentWindows = windows;
