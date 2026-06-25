@@ -1,19 +1,20 @@
-let currentWindows = [];
 let menuItemIds = [];
 let rebuildInProgress = false;
 let pendingRebuildWindowId = null;
 
-// Create context menu items for moving tab to another window
-browser.contextMenus.create( {
-    id: "move-tab-to-window",
-    title: "Move tab to another Window",
-    contexts: [ "tab" ]
+// Clear any stale menu items from a previous script run, then create parent
+browser.contextMenus.removeAll().then( () => {
+    browser.contextMenus.create( {
+        id: "move-tab-to-window",
+        title: "Move tab to another Window",
+        contexts: [ "tab" ]
+    } );
 } );
 
 // Listen for window removal
 browser.windows.onRemoved.addListener( async ( windowId ) => {
-    const currentWindow = await browser.windows.getCurrent();
-    await updateWindowsList( currentWindow.id );
+    const lastFocused = await browser.windows.getLastFocused();
+    await updateWindowsList( lastFocused ? lastFocused.id : -1 );
 } );
 
 async function updateWindowsList( currentActiveWindowId ) {
@@ -37,10 +38,9 @@ async function updateWindowsList( currentActiveWindowId ) {
 async function _rebuildMenu( currentActiveWindowId ) {
     // Get all windows
     const windows = await browser.windows.getAll( { populate: true } );
-    currentWindows = windows;
-
-    // Remove ALL items first
-    for ( const id of menuItemIds ) {
+    // Remove all tracked items plus move-tab-to-new-window (may exist but untracked after a script reload)
+    const idsToRemove = new Set( [ ...menuItemIds, "move-tab-to-new-window" ] );
+    for ( const id of idsToRemove ) {
         try {
             await browser.contextMenus.remove( id );
         } catch ( error ) {
@@ -72,13 +72,17 @@ async function _rebuildMenu( currentActiveWindowId ) {
         }
     }
 
-    await browser.contextMenus.create( {
-        id: "move-tab-to-new-window",
-        title: `Move to new window...`,
-        contexts: [ "tab" ],
-        parentId: "move-tab-to-window"
-    } );
-    menuItemIds.push( "move-tab-to-new-window" );
+    try {
+        await browser.contextMenus.create( {
+            id: "move-tab-to-new-window",
+            title: `Move to new window...`,
+            contexts: [ "tab" ],
+            parentId: "move-tab-to-window"
+        } );
+        menuItemIds.push( "move-tab-to-new-window" );
+    } catch ( error ) {
+        // Item may already exist from a script reload race
+    }
 
     try {
         await browser.contextMenus.refresh();
@@ -103,12 +107,7 @@ async function createNewWindowWithTabs( tabIds ) {
 // Update windows list when context menu is shown
 browser.contextMenus.onShown.addListener( async ( info, tab ) => {
     try {
-        if ( tab && tab.windowId ) {
-            await updateWindowsList( tab.windowId );
-        } else {
-            const currentWindow = await browser.windows.getCurrent();
-            await updateWindowsList( currentWindow.id );
-        }
+        await updateWindowsList( tab.windowId );
     } catch ( error ) {
         // Silently fail if we can't update the menu
     }
