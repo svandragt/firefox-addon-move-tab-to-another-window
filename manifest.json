@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Move Tab to Another Window",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Move a tab to another browser window or to a new window from the tab right-click menu.",
   "homepage_url": "https://github.com/svandragt/firefox-addon-move-tab-to-another-window",
   "browser_specific_settings": {
